@@ -550,8 +550,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 )
             )
 
+    @staticmethod
     def prep_ip_adapter_image_prompts(
-        self,
         context: InvocationContext,
         ip_adapters: List[IPAdapterField],
     ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
@@ -578,8 +578,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         return image_prompts
 
+    @staticmethod
     def prep_ip_adapter_data(
-        self,
         context: InvocationContext,
         ip_adapters: List[IPAdapterField],
         image_prompts: List[Tuple[torch.Tensor, torch.Tensor]],
@@ -597,7 +597,9 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
             mask_field = single_ip_adapter.mask
             mask = context.tensors.load(mask_field.tensor_name) if mask_field is not None else None
-            mask = self._preprocess_regional_prompt_mask(mask, latent_height, latent_width, dtype=dtype)
+            mask = DenoiseLatentsInvocation._preprocess_regional_prompt_mask(
+                mask, latent_height, latent_width, dtype=dtype
+            )
 
             ip_adapter_data_list.append(
                 IPAdapterData(
@@ -826,6 +828,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _new_invoke(self, context: InvocationContext) -> LatentsOutput:
+        print("New invoke")
         ext_manager = ExtensionsManager(is_canceled=context.util.is_canceled)
 
         device = TorchDevice.choose_torch_device()
@@ -961,6 +964,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
     @torch.no_grad()
     @SilenceWarnings()  # This quenches the NSFW nag from diffusers.
     def _old_invoke(self, context: InvocationContext) -> LatentsOutput:
+        print("OLD INVOKE")
         device = TorchDevice.choose_torch_device()
         seed, noise, latents = self.prepare_noise_and_latents(context, self.noise, self.latents)
 
@@ -992,7 +996,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         # a series of image conditioning embeddings. This is being done here rather than in the
         # big model context below in order to use less VRAM on low-VRAM systems.
         # The image prompts are then passed to prep_ip_adapter_data().
-        image_prompts = self.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
+        image_prompts = DenoiseLatentsInvocation.prep_ip_adapter_image_prompts(context=context, ip_adapters=ip_adapters)
 
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
@@ -1074,6 +1078,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 latent_width=latent_width,
                 dtype=unet.dtype,
             )
+
+            print("ip_adapter_data", ip_adapter_data)
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
                 scheduler,
